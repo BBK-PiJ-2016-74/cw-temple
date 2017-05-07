@@ -2,6 +2,8 @@ package student;
 
 import game.EscapeState;
 import game.ExplorationState;
+import sun.jvm.hotspot.debugger.posix.elf.ELFSectionHeader;
+
 import java.util.TreeSet;
 import java.util.SortedSet;
 import java.util.ArrayList;
@@ -48,17 +50,55 @@ public class Explorer {
 
     private SortedSet open;
     private SortedSet closed;
+    private ExplorationState stateExplore;
+    private EscapeState stateEscape;
+    private Vertex currentVertex;
 
-    public void vertex_print(Vertex v) {
+
+
+
+    public void AddToOpenWithCheck(Vertex vnew){
+
+        //((Vertex)open.first()).distanceToTarget = 999;
+        Vertex vold = findNode(open, vnew.id);
+        if (vold!=null) {
+            if (vnew.id == vold.id && vnew.f < vold.f) {
+                //replace vertex only if same vertex but node calculated closer path if closer
+                open.remove(vold);
+            }
+        }
+        open.add(vnew);
+    }
+
+
+
+    public void MoveToClosed(long id)
+    {
+        Vertex fv = findNode(open,id);
+        open.remove(fv);
+        closed.add(fv);
+    }
+
+
+    public void printVertexOpen(Vertex v) {
         System.out.println("==========================");
         System.out.println("vertex:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
     }
 
-    public void neighbour_print(Vertex v) {
-        System.out.println("neighbour:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
+    public void printNeighbourClosed(Vertex v) {
+        System.out.println("neighbour CLOSED:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
     }
 
-    public Vertex findNode(SortedSet ss, int id) {
+    public void printNeighbourOpen(Vertex v) {
+        System.out.println("neighbour OPEN:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
+    }
+
+    public void printNeighbourFoundOpen(Vertex v) {
+        System.out.println("neighbour FOUND OPEN:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
+    }
+
+
+    public Vertex findNode(SortedSet ss, long id) {
 
         java.util.Iterator<Vertex> iterator = ss.iterator();
         while(iterator.hasNext()) {
@@ -70,59 +110,105 @@ public class Explorer {
         return null;
     }
 
-    public void MoveToClosed(long id)
-    {
-        Vertex fv = findNode(open,id);
-        open.remove(fv);
-        closed.add(fv);
+
+
+
+
+    //open = unexplored paths
+    //closed = all explored
+    public void GoToClosestOpenTile(Vertex closestOpenVertex){
+        if (closestOpenVertex.id == stateExplore.getCurrentLocation()){
+            printVertexOpen(currentVertex);
+            System.out.println("GOTO: IS ON CLOSEST NOW");
+            return;
+        }
+
+        //iterate through close, find current, move to parent
+        while (closestOpenVertex.id != currentVertex.id) {
+
+            //TODO inefficient might not be fastest
+            System.out.println("GOTO BACK: id: " + currentVertex.parent.id);
+            stateExplore.moveTo(currentVertex.parent.id);
+            currentVertex = currentVertex.parent;
+
+        }
+        printVertexOpen(currentVertex);
     }
 
-    public void explore(ExplorationState state) {
-        //TODO:
-        int step = 0;
-        open = new TreeSet();
-        closed = new TreeSet();
+    public void ProcessNeighbours (){
 
-        //ArrayList open = new ArrayList();
-        //ArrayList closed = new ArrayList();
+        for (java.util.Iterator<game.NodeStatus> i = stateExplore.getNeighbours().iterator(); i.hasNext(); ) {
+            game.NodeStatus n = i.next();
 
-        //populate first step
-        Vertex v = new Vertex(
-                state.getCurrentLocation(),
-                step,
-                state.getDistanceToTarget(),
-                null,
-                state);
-
-        open.add (v);
-        vertex_print(v);
-        next_id = v.id;
-
-        while (state.getDistanceToTarget() != 0) {
-
-            v = findNode(open, next_id);
-
-
-            for (java.util.Iterator<game.NodeStatus> i = state.getNeighbours().iterator(); i.hasNext(); ) {
-                game.NodeStatus n = i.next();
-                Vertex vn = new Vertex(n.getId(), v.step + 1, n.getDistanceToTarget(), v, null);
-                neighbour_print(vn);
-
-                open.add (vn);
-
+            //find in closed, if there we can skip iteration
+            Vertex vertex_closed_result = findNode(closed, n.getId());
+            if (vertex_closed_result!=null) {
+                printNeighbourClosed (vertex_closed_result);
+                continue;
             }
 
 
+            Vertex neighbourVertex = new Vertex(n.getId(), currentVertex.step + 1, n.getDistanceToTarget(), currentVertex, null);
+
+
+
+            //find in open, if found compare distance, if closer replace
+            Vertex vertex_open_result = findNode(open, n.getId());
+            if (vertex_open_result!=null){
+                //OPEN FIND OUT IF CLOSER
+                //if (vertex_open_result.f < currentVertex.f)
+                //{
+                //    open.remove(currentVertex);
+                //    open.add(vertex_open_result);
+               // }
+                printNeighbourFoundOpen (vertex_open_result);
+            }
+            else
+            {
+                //VERTEX NOT IN CLOSED, NOT IN OPEN, ADD TO OPEN
+                open.add(neighbourVertex);
+                printNeighbourOpen(neighbourVertex);
+            }
+
+
+
+        }
+    }
+
+
+
+
+
+    public void explore(ExplorationState state) {
+
+        int step = 0;
+        open = new TreeSet();
+        closed = new TreeSet();
+        stateExplore = state;
+
+        currentVertex = new Vertex(state.getCurrentLocation(), step, stateExplore.getDistanceToTarget(), null, state);
+        open.add(currentVertex);
+
+        while (state.getDistanceToTarget() != 0) {
+
+            GoToClosestOpenTile((Vertex)open.first());
+
+
+            ProcessNeighbours();
+
+
+
+
             //decide
-            MoveToClosed(v.id);
+            //MoveToClosed(v.id);
 
             //((Vertex)open.first()).distanceToTarget = 999;
-            Vertex fv = findNode(open,0);
-            open.remove(fv);
-            fv.distanceToTarget = 10;
-            open.add(fv);
+            //Vertex fv = findNode(open,0);
+            //open.remove(fv);
+            //fv.distanceToTarget = 10;
+            //open.add(fv);
 
-            state.moveTo(((Vertex)open.first()).id);
+            //state.moveTo(((Vertex)open.first()).id);
 
         }
 
