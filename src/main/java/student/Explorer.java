@@ -2,6 +2,15 @@ package student;
 
 import game.EscapeState;
 import game.ExplorationState;
+import java.util.TreeSet;
+import java.util.SortedSet;
+import java.util.ArrayList;
+
+
+
+
+
+
 
 public class Explorer {
 
@@ -35,9 +44,91 @@ public class Explorer {
    *
    * @param state the information available at the current state
    */
-  public void explore(ExplorationState state) {
-    //TODO:
-  }
+
+
+    private SortedSet open;
+    private SortedSet closed;
+
+    public void vertex_print(Vertex v) {
+        System.out.println("==========================");
+        System.out.println("vertex:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
+    }
+
+    public void neighbour_print(Vertex v) {
+        System.out.println("neighbour:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
+    }
+
+    public Vertex findNode(SortedSet ss, int id) {
+
+        java.util.Iterator<Vertex> iterator = ss.iterator();
+        while(iterator.hasNext()) {
+            Vertex v = iterator.next();
+            if(v.id == id)
+                return v;
+        }
+
+        return null;
+    }
+
+    public void MoveToClosed(long id)
+    {
+        Vertex fv = findNode(open,id);
+        open.remove(fv);
+        closed.add(fv);
+    }
+
+    public void explore(ExplorationState state) {
+        //TODO:
+        int step = 0;
+        open = new TreeSet();
+        closed = new TreeSet();
+
+        //ArrayList open = new ArrayList();
+        //ArrayList closed = new ArrayList();
+
+        //populate first step
+        Vertex v = new Vertex(
+                state.getCurrentLocation(),
+                step,
+                state.getDistanceToTarget(),
+                null,
+                state);
+
+        open.add (v);
+        vertex_print(v);
+        next_id = v.id;
+
+        while (state.getDistanceToTarget() != 0) {
+
+            v = findNode(open, next_id);
+
+
+            for (java.util.Iterator<game.NodeStatus> i = state.getNeighbours().iterator(); i.hasNext(); ) {
+                game.NodeStatus n = i.next();
+                Vertex vn = new Vertex(n.getId(), v.step + 1, n.getDistanceToTarget(), v, null);
+                neighbour_print(vn);
+
+                open.add (vn);
+
+            }
+
+
+            //decide
+            MoveToClosed(v.id);
+
+            //((Vertex)open.first()).distanceToTarget = 999;
+            Vertex fv = findNode(open,0);
+            open.remove(fv);
+            fv.distanceToTarget = 10;
+            open.add(fv);
+
+            state.moveTo(((Vertex)open.first()).id);
+
+        }
+
+
+
+    }
 
   /**
    * Escape from the cavern before the ceiling collapses, trying to collect as much
