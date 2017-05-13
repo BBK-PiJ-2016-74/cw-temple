@@ -16,14 +16,16 @@ public class Map implements Runnable{
     //private ExplorationState stateExplore;
     private EscapeState stateEscape;
     private Vertex currentVertex;
+    private Vertex firstVertex;
     private Boolean isProcessing;
     private ExplorationState stateExploration;
     private int step;
-    private long bestCandidate;
+    private Vertex closestOpenVertex;
 
     Map (ExplorationState s){
         step = 0;
-        bestCandidate = 0;
+        closestOpenVertex = null;
+        firstVertex = null;
         open = new ArrayList();
         closed = new ArrayList();
         //sequence = new ArrayList();
@@ -31,21 +33,7 @@ public class Map implements Runnable{
         stateExploration = s;
     }
 
-    public void run() {
 
-        //initial tile pre loop
-        currentVertex = new Vertex(stateExploration.getCurrentLocation(), step, stateExploration.getDistanceToTarget(), null, stateExploration);
-        open.add(currentVertex);
-
-        while (stateExploration.getDistanceToTarget() != 0) {
-            bestCandidate = GoToClosestOpenTile(currentVertex);
-            ProcessNeighbours();
-            stateExploration.moveTo(bestCandidate);
-        }
-
-
-
-    }
 
     public void AddToOpenWithCheck(Vertex vnew){
 
@@ -62,29 +50,38 @@ public class Map implements Runnable{
 
 
 
-    public void MoveToClosed(long id)
+    public void CloseVertex(long id)
     {
         Vertex fv = findNode(open,id);
         open.remove(fv);
         closed.add(fv);
+        printVertexClosed(fv);
     }
 
 
-    public void printVertexOpen(Vertex v) {
+    public void printVertexCurrent(Vertex v) {
         System.out.println("==========================");
-        System.out.println("vertex:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
+        System.out.println("VERTEX CURRENT: " + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
     }
 
-    public void printNeighbourClosed(Vertex v) {
-        System.out.println("neighbour CLOSED:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
+    public void printVertexClosed(Vertex v) {
+        System.out.println("VERTEX NOW CLOSED:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
     }
 
     public void printNeighbourOpen(Vertex v) {
-        System.out.println("neighbour OPEN:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
+        System.out.println("neighbour NEW OPEN:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
     }
 
-    public void printNeighbourFoundOpen(Vertex v) {
-        System.out.println("neighbour FOUND OPEN:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
+    public void printNeighbourExistingOpen(Vertex v) {
+        System.out.println("neighbour EXISTING OPEN:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
+    }
+
+    public void printNeighbourExistingClosed(Vertex v) {
+        System.out.println("neighbour EXISTING CLOSED:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
+    }
+
+    public void printDistanceToTarget() {
+        System.out.println("DISTANCE TO TARGET:" + stateExploration.getDistanceToTarget());
     }
 
 
@@ -100,30 +97,96 @@ public class Map implements Runnable{
         return null;
     }
 
+    public Vertex findClosestOpenVertex() {
+
+        java.util.Iterator<Vertex> iterator = open.iterator();
+        int closest = 32000;
+        Vertex ret = null;
+        while(iterator.hasNext()) {
+            Vertex v = iterator.next();
+            if(v.distanceToTarget < closest){
+                closest = v.distanceToTarget;
+                ret = v;
+            }
+        }
+
+        return ret;
+    }
 
 
 
+    public void run() {
+
+        //initial tile pre loop
+        currentVertex = new Vertex(stateExploration.getCurrentLocation(), step, stateExploration.getDistanceToTarget(), null, stateExploration);
+        firstVertex = currentVertex;
+        AddToOpenWithCheck(currentVertex);
+
+        while (stateExploration.getDistanceToTarget() != 0) {
+
+            ProcessNeighbours();
+            CloseVertex (currentVertex.id);
+            closestOpenVertex = findClosestOpenVertex();
+            GoToClosestOpenTile(closestOpenVertex);
+
+
+        }
+
+
+
+    }
 
 
     //open = unexplored paths
     //closed = all explored
     public long GoToClosestOpenTile(Vertex closestOpenVertex){
-        if (closestOpenVertex.id == stateExploration.getCurrentLocation()){
-            printVertexOpen(currentVertex);
-            System.out.println("GOTO: IS ON CLOSEST NOW");
-            return currentVertex.id;
-        }
+        //if (closestOpenVertex.id == stateExploration.getCurrentLocation()){
+        //    printVertexOpen(currentVertex);
+        //    System.out.println("GOTO: IS ON CLOSEST NOW");
+        //    return currentVertex.id;
+        //}
 
-        //iterate through close, find current, move to parent
-        while (closestOpenVertex.id != currentVertex.id) {
+        //iterate through closed, find current, move to parent
+        while (currentVertex.id != closestOpenVertex.id) {
+
+
+
+
+            //if closest open is in state, go forward one
+            //if closest open is not in state go to parent (and hope parent not null)
 
             //TODO inefficient might not be fastest
-            System.out.println("GOTO BACK: id: " + currentVertex.parent.id);
-            stateExploration.moveTo(currentVertex.parent.id);
-            currentVertex = currentVertex.parent;
+            if (currentVertex.parent != null)
+            {
+
+                //if closest open is in state, go forward one
+                //this is wrong try this
+                  //if closestopenvertex
+                if (closestOpenVertex.parent.id == currentVertex.id) {
+                    System.out.println("GO FWD: id: " + closestOpenVertex.id);
+                    stateExploration.moveTo(closestOpenVertex.id);
+                    currentVertex = closestOpenVertex;
+                }
+                else
+                {
+                    System.out.println("GO BACK: id: " + currentVertex.parent.id);
+                    stateExploration.moveTo(currentVertex.parent.id);
+                    currentVertex = currentVertex.parent;
+                }
+
+
+            }
+            else {
+                //first tile has no parent but might have to go back there at some point
+                // this should hard coded point to 1st
+                System.out.println("INITIAL: id: " + firstVertex.id);
+                if (stateExploration.getCurrentLocation() != closestOpenVertex.id)
+                    stateExploration.moveTo(closestOpenVertex.id);
+                currentVertex = closestOpenVertex;
+            }
 
         }
-        printVertexOpen(currentVertex);
+        printVertexCurrent(currentVertex);
         return currentVertex.id;
 
     }
@@ -133,37 +196,29 @@ public class Map implements Runnable{
         for (java.util.Iterator<game.NodeStatus> i = stateExploration.getNeighbours().iterator(); i.hasNext(); ) {
             game.NodeStatus n = i.next();
 
-            //find in closed, if there we can skip iteration
+
+
+            //find existing in closed, if there we can skip iteration
             Vertex vertex_closed_result = findNode(closed, n.getId());
             if (vertex_closed_result!=null) {
-                printNeighbourClosed (vertex_closed_result);
+                printNeighbourExistingClosed (vertex_closed_result);
+                continue;
+            }
+
+            //find existing in open, if there we can skip iteration
+            Vertex vertex_open_result = findNode(open, n.getId());
+            if (vertex_open_result!=null) {
+                printNeighbourExistingOpen (vertex_open_result);
                 continue;
             }
 
 
-            Vertex neighbourVertex = new Vertex(n.getId(), currentVertex.step + 1, n.getDistanceToTarget(), currentVertex, null);
+            Vertex neighbourOpenVertex = new Vertex(n.getId(), currentVertex.step + 1, n.getDistanceToTarget(), currentVertex, null);
+            AddToOpenWithCheck(neighbourOpenVertex);
+            printNeighbourOpen (neighbourOpenVertex);
 
 
-
-            //find in open, if found compare distance, if closer replace
-            Vertex vertex_open_result = findNode(open, n.getId());
-            if (vertex_open_result!=null){
-                //OPEN FIND OUT IF CLOSER
-                //if (vertex_open_result.f < currentVertex.f)
-                //{
-                //    open.remove(currentVertex);
-                //    open.add(vertex_open_result);
-                //}
-                printNeighbourFoundOpen (vertex_open_result);
-            }
-            else
-            {
-                //VERTEX NOT IN CLOSED, NOT IN OPEN, ADD TO OPEN
-                open.add(neighbourVertex);
-                printNeighbourOpen(neighbourVertex);
-            }
-
-
+            //TODO: if distance closer from here, replace open
 
         }
     }
@@ -173,11 +228,11 @@ public class Map implements Runnable{
 
 
 
-    private synchronized void MoveTo(long tile){
+    private synchronized void MoveTo(long id){
 
 
-        if (stateExploration.getCurrentLocation() != tile)
-            stateExploration.moveTo(tile);
+        if (stateExploration.getCurrentLocation() != id)
+            stateExploration.moveTo(id);
         //currentVertex = new Vertex(state.getCurrentLocation(), step, stateExplore.getDistanceToTarget(), null, state);
         //open.add(currentVertex);
 
