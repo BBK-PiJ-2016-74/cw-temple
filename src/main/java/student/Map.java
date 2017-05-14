@@ -2,6 +2,7 @@ package student;
 import game.EscapeState;
 import game.ExplorationState;
 
+import java.util.HashSet;
 import java.util.TreeSet;
 import java.util.SortedSet;
 import java.util.ArrayList;
@@ -21,11 +22,15 @@ public class Map implements Runnable{
     private ExplorationState stateExploration;
     private int step;
     private Vertex closestOpenVertex;
+    private Vertex mapBuildingStepVertex;
+    private java.util.List mapClosestOpenVertex;
 
     Map (ExplorationState s){
         step = 0;
         closestOpenVertex = null;
         firstVertex = null;
+        mapBuildingStepVertex = null;
+        mapClosestOpenVertex = null;
         open = new ArrayList();
         closed = new ArrayList();
         //sequence = new ArrayList();
@@ -42,6 +47,7 @@ public class Map implements Runnable{
         if (vold!=null) {
             if (vnew.id == vold.id && vnew.f < vold.f) {
                 //replace vertex only if same vertex but node calculated closer path if closer
+                //replace values plus parent
                 open.remove(vold);
             }
         }
@@ -84,6 +90,14 @@ public class Map implements Runnable{
         System.out.println("DISTANCE TO TARGET:" + stateExploration.getDistanceToTarget());
     }
 
+    public void printMapAddStep(Vertex v) {
+        System.out.println("mapAddStep MAP STEP:" + v.id + " g-travelledFromSource:" + v.step + " h-distanceToTarget:" + v.distanceToTarget + " f-weightedDistance:" + v.f);
+    }
+
+    public void printWormholeAddStep(long l) {
+        System.out.println("wormholeAddStep MAP STEP:" + l );
+    }
+
 
     public Vertex findNode(ArrayList al, long id) {
 
@@ -111,6 +125,28 @@ public class Map implements Runnable{
         }
 
         return ret;
+    }
+
+
+    public Boolean buildOpenVertexMap()
+    {
+
+        Boolean isIntersectingWithCurrentVertex = false;
+        mapClosestOpenVertex = new ArrayList<Long>();
+        mapBuildingStepVertex = closestOpenVertex;
+        while (mapBuildingStepVertex != null)
+        {
+            mapClosestOpenVertex.add(mapBuildingStepVertex.id);
+            printMapAddStep (mapBuildingStepVertex);
+            if (currentVertex.id == mapBuildingStepVertex.id){
+                isIntersectingWithCurrentVertex = true;
+                return isIntersectingWithCurrentVertex;
+            }
+            mapBuildingStepVertex = mapBuildingStepVertex.parent;
+        }
+
+        return isIntersectingWithCurrentVertex;
+
     }
 
 
@@ -169,9 +205,72 @@ public class Map implements Runnable{
                 }
                 else
                 {
-                    System.out.println("GO BACK: id: " + currentVertex.parent.id);
-                    stateExploration.moveTo(currentVertex.parent.id);
-                    currentVertex = currentVertex.parent;
+
+                    //build back map from open to start
+                    Boolean isIntersectingWithCurrent = buildOpenVertexMap();
+
+                    //keep going back until we get back onto known path (expensive)
+                    while (!mapClosestOpenVertex.contains(currentVertex.id))
+                    {
+
+                        //we are still not intersecting
+                        System.out.println("GO BACK ONE: id: " + currentVertex.parent.id);
+                        stateExploration.moveTo(currentVertex.parent.id);
+                        currentVertex = currentVertex.parent;
+                    }
+
+
+                    //we know map forward now, use it
+                    System.out.println("INTERSECTION FOUND AT :" + currentVertex.id + " USING MAP TO GET TO CLOSEST OPEN: id: " + closestOpenVertex.id);
+
+                    //iterate through known map from the point of intersection and towards closest node
+
+                    int intersectionLocationWithinKnownMap = mapClosestOpenVertex.indexOf(currentVertex.id);
+                    //long[] arr2 = new long[intersectionLocationWithinKnownMap];
+                    //int i = 0;
+                    //for (java.util.Iterator<Long> e : mapClosestOpenVertex) {
+                    //    arr2[i++] = e; // autoboxing does the job here
+                    //}
+
+                    for (int l = intersectionLocationWithinKnownMap-1; l >=0; l--){
+                        long pos = (long)mapClosestOpenVertex.get(l);
+                        stateExploration.moveTo(pos);
+                        printWormholeAddStep(pos);
+                    }
+                    //we can assume but we wont, look up pos node
+                    //current vertex should be equal to closestOpenVertex.id
+                    //pos should have been stateExploration.getCurrentLocation()
+                    //we are in open node now closest to destination (according to calculations)
+                    currentVertex = findNode(open,stateExploration.getCurrentLocation());
+
+                    /*
+                    for (java.util.Iterator<Long> iter = mapClosestOpenVertex.iterator(); iter.hasNext(); )
+                    {
+                        Long l = iter.next();
+                        stateExploration.moveTo(l);
+                    }
+                    currentVertex = closestOpenVertex;
+
+
+                    if (isIntersectingWithCurrent){
+                        //we know map forward now, use it
+                        System.out.println("INTERSECTION FOUND. USE MAP TO GET TO CLOSEST: id: " + currentVertex.parent.id);
+                        java.util.Collections.sort(mapClosestOpenVertex, java.util.Collections.reverseOrder());
+                        for (java.util.Iterator<Long> iter = mapClosestOpenVertex.iterator(); iter.hasNext(); )
+                        {
+                            Long l = iter.next();
+                            stateExploration.moveTo(l);
+                        }
+                        currentVertex = closestOpenVertex;
+                    }
+                    else
+                    {
+                        //we are still not intersecting
+                        System.out.println("GO BACK ONE: id: " + currentVertex.parent.id);
+                        stateExploration.moveTo(currentVertex.parent.id);
+                        currentVertex = currentVertex.parent;
+                    }
+                    */
                 }
 
 
@@ -179,6 +278,7 @@ public class Map implements Runnable{
             else {
                 //first tile has no parent but might have to go back there at some point
                 // this should hard coded point to 1st
+                //no parent means INITIAL
                 System.out.println("INITIAL: id: " + firstVertex.id);
                 if (stateExploration.getCurrentLocation() != closestOpenVertex.id)
                     stateExploration.moveTo(closestOpenVertex.id);
