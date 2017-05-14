@@ -46,9 +46,6 @@ public class Explorer {
         Map mrexplorer = new Map(state);
         mrexplorer.run();
 
-
-
-
     }
 
     /**
@@ -76,6 +73,8 @@ public class Explorer {
      * @param state the information available at the current state
      */
     public void escape(EscapeState state) {
-        //TODO: Escape from the cavern before time runs out
+
+        MapGold escapewithgold = new MapGold(state);
+        escapewithgold.run();
     }
 }
